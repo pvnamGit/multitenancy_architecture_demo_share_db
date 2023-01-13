@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="add_cs_user_privileges" author="nampvholistics">
+        <sql dbms="postgresql" splitStatements="true">
+            CREATE USER ${user_name} WITH PASSWORD '${password}';
+            GRANT CONNECT ON DATABASE ${database} TO ${user_name};
+            ALTER DEFAULT PRIVILEGES IN SCHEMA ${schema} GRANT SELECT, INSERT, UPDATE, DELETE, REFERENCES
+                                                               ON TABLES TO ${user_name};
+            ALTER DEFAULT PRIVILEGES IN SCHEMA ${schema} GRANT USAGE ON SEQUENCES TO ${user_name};
+            ALTER DEFAULT PRIVILEGES IN SCHEMA ${schema} GRANT EXECUTE ON FUNCTIONS TO ${user_name};
+        </sql>
+    </changeSet>
+
+    <changeSet id="grant_permission_to_cs_user" author="nampvholistics">
+        <sql dbms="postgresql" splitStatements="true">
+            REVOKE ALL
+                ON ALL TABLES IN SCHEMA ${schema}
+                FROM ${schema};
+
+            GRANT SELECT, INSERT, UPDATE, DELETE
+                  ON ALL TABLES IN SCHEMA ${schema}
+                      TO ${user_name};
+        </sql>
+    </changeSet>
+
+    <changeSet id="create-alumni-table" author="nampvholistics">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="alumnus"/>
+            </not>
+        </preConditions>
+        <createTable tableName="alumnus">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="alumni_id" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="full_name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="email" type="varchar2(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="phone_number" type="varchar2(200)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="timestamp(6)"/>
+            <column name="updated_at" type="timestamp(6)"/>
+        </createTable>
+        <addUniqueConstraint tableName="alumnus" constraintName="unique_alumni"
+                             columnNames="alumni_id"/>
+    </changeSet>
+
+    <changeSet id="add-tenant-id-to-alumni-table" author="nampvholistics">
+        <addColumn tableName="alumnus">
+            <column name="tenant_id" type="VARCHAR(30)" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="alumni_row_level_security" author="nampvholistics">
+        <sql dbms="postgresql" splitStatements="true">
+            ALTER TABLE alumnus ENABLE ROW LEVEL SECURITY;
+            DROP POLICY IF EXISTS alumni_tenant_isolation_policy ON alumnus;
+            CREATE POLICY alumni_tenant_isolation_policy ON alumnus
+            USING (tenant_id = current_setting('app.tenant_id')::VARCHAR);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
